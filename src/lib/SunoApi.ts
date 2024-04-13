@@ -3,10 +3,13 @@ import UserAgent from 'user-agents';
 import pino from 'pino';
 import { wrapper } from "axios-cookiejar-support";
 import { CookieJar } from "tough-cookie";
-import { sleep } from "@/lib/utils";
+import { sleep, wait } from "@/lib/utils";
 
-const logger = pino();
+const cookies: string[] = JSON.parse(process.env.SUNO_COOKIES || '[]')
+const data: Array<{cookie: string, credits: number, api: SunoApi}> = []
+let inited = false;
 
+const logger = pino({level: 'error'});
 
 export interface AudioInfo {
   id: string; // Unique identifier for the audio
@@ -90,7 +93,7 @@ class SunoApi {
       await sleep(1, 2);
     }
     const newToken = renewResponse.data['jwt'];
-    console.log("newToken:===\n\n", newToken);
+    // console.log("newToken:===\n\n", newToken);
     // Update Authorization field in request header with the new JWT token
     this.currentToken = newToken;
   }
@@ -141,6 +144,15 @@ class SunoApi {
     return audios;
   }
 
+  private changeBalance(){
+    const d = data.find(({api}) => api === this)
+    if(d){
+      d.credits -= 10
+    } else {
+      logger.error(`cant find data for ${this.currentToken}`)
+    }
+  }
+
   /**
    * Generates songs based on the provided parameters.
    *
@@ -189,7 +201,9 @@ class SunoApi {
         timeout: 10000, // 10 seconds timeout
       },
     );
+
     logger.info("generateSongs Response:\n" + JSON.stringify(response.data, null, 2));
+    this.changeBalance()
     if (response.status !== 200) {
       throw new Error("Error response:" + response.statusText);
     }
@@ -251,6 +265,8 @@ class SunoApi {
       lyricsResponse = await this.client.get(`${SunoApi.BASE_URL}/api/generate/lyrics/${generateId}`);
     }
 
+    this.changeBalance()
+
     // Return the generated lyrics text
     return lyricsResponse.data;
   }
@@ -310,7 +326,7 @@ class SunoApi {
     }));
   }
 
-  public async get_credits(): Promise<object> {
+  public async get_credits() {
     await this.keepAlive(false);
     const response = await this.client.get(`${SunoApi.BASE_URL}/api/billing/info/`);
     return {
@@ -327,4 +343,36 @@ const newSunoApi = async (cookie: string) => {
   return await sunoApi.init();
 }
 
-export const sunoApi = newSunoApi(process.env.SUNO_COOKIE || '');
+async function getTokensQuota(){
+  for(const c of cookies){
+    const suno = await newSunoApi(c)
+    data.push({cookie: c, credits: (await suno.get_credits()).credits_left, api: suno})
+  }
+
+  inited = true;
+}
+
+getTokensQuota()
+
+// once in hour
+setInterval(async () => {
+  for(const item of data){
+    const credits = (await item.api.get_credits()).credits_left
+    item.credits = credits;
+  }
+}, 3600_000)
+
+
+export async function getSuno(): Promise<SunoApi>{
+  await wait(() => inited)
+
+  for(const {credits, api} of data){
+    if(credits > 0) return api
+  }
+
+
+  logger.error('cant find account with credits')
+  throw new Error('cant find account with credits')
+}
+
+// export const sunoApi = getSuno();

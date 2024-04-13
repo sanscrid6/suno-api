@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { sunoApi } from "@/lib/SunoApi";
+import { getSuno } from "@/lib/SunoApi";
 import { corsHeaders } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   if (req.method === 'GET') {
     try {
 
-      const limit = await (await sunoApi).get_credits();
+      const limit = await (await getSuno()).get_credits();
 
 
       return new NextResponse(JSON.stringify(limit), {

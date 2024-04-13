@@ -26,3 +26,9 @@ export const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
+
+export async function wait(p: () => boolean) {
+  while(!p()){
+    await new Promise(r => setTimeout(r, 50))
+  }
+}

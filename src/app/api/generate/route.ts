@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import { sunoApi } from "@/lib/SunoApi";
+import { getSuno } from "@/lib/SunoApi";
 import { corsHeaders } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      const audioInfo = await (await sunoApi).generate(prompt, make_instrumental == true, wait_audio == true);
+      const audioInfo = await (await getSuno()).generate(prompt, make_instrumental == true, wait_audio == true);
 
       return new NextResponse(JSON.stringify(audioInfo), {
         status: 200,
