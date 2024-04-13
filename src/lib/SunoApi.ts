@@ -199,8 +199,15 @@ class SunoApi {
       payload,
       {
         timeout: 10000, // 10 seconds timeout
+        validateStatus: status => (status >= 200 && status < 300) || status === 402
       },
     );
+    if(response.status === 402) {
+      data.find(d => d.api === this)!.credits = 0;
+      const e = new Error('Insuficient credits');
+      (e as any).response = response;
+      throw e
+    }
 
     logger.info("generateSongs Response:\n" + JSON.stringify(response.data, null, 2));
     this.changeBalance()
@@ -346,7 +353,7 @@ const newSunoApi = async (cookie: string) => {
 async function getTokensQuota(){
   for(const c of cookies){
     const suno = await newSunoApi(c)
-    data.push({cookie: c, credits: (await suno.get_credits()).credits_left, api: suno})
+    data.push({cookie: c, credits: 10, api: suno})
   }
 
   inited = true;
